@@ -1,128 +1,89 @@
 # 2048 AI with Deep Q-Learning
 
-This project implements an AI agent that learns to play the game 2048 using Deep Q-Learning (DQN). The agent is trained to maximize its score by making optimal moves on a 4x4 grid.
+This project implements an AI agent that learns to play the 2048 game using Deep Q-Learning (DQN). The agent learns to make optimal moves in the 4x4 grid to achieve the highest possible score.
 
 ## Project Structure
 
 ```
-2048_AI/
-│
-├── game/
-│   ├── __init__.py
-│   ├── game_environment.py      # Gym environment for 2048
-│   ├── game_logic.py            # Core game logic
-│   └── game_renderer.py         # Pygame-based visualization
-│
-├── agent/
-│   ├── __init__.py
-│   ├── dqn_agent.py             # DQN agent implementation
-│   └── replay_buffer.py         # Experience replay buffer
-│
-├── training/
-│   ├── train.py                 # Training script
-│   └── utils.py                 # Utility functions
-│
-├── graphics/
-│   └── display.py               # Game visualization
-│
-├── results/
-│   └── logs/                    # Training logs and models
-│
-└── README.md
+2048-AI/
+├── game.py           # Game environment implementation
+├── model.py          # DQN neural network model
+├── agent.py          # DQN agent implementation
+├── train.py          # Training script
+├── requirements.txt  # Project dependencies
+└── README.md         # Project documentation
 ```
 
-## Installation
+## Dependencies
 
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd 2048_AI
-```
+Install the required packages using:
 
-2. Create a virtual environment (recommended):
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-## Usage
+## How It Works
 
-### Training the AI
+1. **Game Environment (game.py)**:
+   - Implements the 2048 game mechanics
+   - Uses Pygame for visualization
+   - Provides an interface for the AI agent to interact with
 
-To train the AI agent:
+2. **DQN Model (model.py)**:
+   - Neural network architecture for Q-learning
+   - Input: 4x4 game board state (16 values)
+   - Hidden layers: 256 neurons each
+   - Output: Q-values for 4 possible actions (up, down, left, right)
 
+3. **Agent (agent.py)**:
+   - Implements the DQN agent with experience replay
+   - Uses epsilon-greedy strategy for exploration
+   - Manages the training process and decision making
+
+4. **Training (train.py)**:
+   - Main training loop
+   - Plots training progress
+   - Saves best performing models
+
+## Training Process
+
+The agent uses the following techniques:
+- Experience replay buffer (100,000 experiences)
+- Epsilon-greedy exploration strategy
+- Reward shaping based on score and valid moves
+- Automatic model saving for best performances
+
+## Running the Project
+
+1. Train the agent:
 ```bash
-python -m training.train
+python train.py
 ```
 
-The training script will:
-- Train the agent for 10,000 episodes
-- Save the best model and checkpoints every 500 episodes
-- Display training progress every 1000 episodes
-- Generate training plots and logs in the `results` directory
+2. The training script will:
+   - Display the game board
+   - Show real-time training statistics
+   - Plot the scores and mean scores
+   - Save the best performing model
 
-### Playing the Game Manually
+## Model Architecture
 
-To play the game manually:
+- Input layer: 16 neurons (4x4 board)
+- Hidden layer 1: 256 neurons with ReLU
+- Hidden layer 2: 256 neurons with ReLU
+- Output layer: 4 neurons (one for each direction)
 
-```bash
-python -m graphics.display
-```
+## Rewards Structure
 
-Use the arrow keys to move tiles:
-- ↑: Move up
-- →: Move right
-- ↓: Move down
-- ←: Move left
+- Score increase: Positive reward equal to the merge value
+- Invalid move: -10 reward
+- Game over: -10 reward
+- Reaching 2048: +100 reward
 
-### Using a Trained Model
+## Performance
 
-To use a trained model to play the game:
-
-```python
-from game.game_environment import Game2048Env
-from agent.dqn_agent import DQNAgent
-
-# Load the trained model
-agent = DQNAgent(state_shape=(4, 4), action_size=4)
-agent.load('results/models/best_model.h5')
-
-# Create environment
-env = Game2048Env()
-
-# Play one episode
-state = env.reset()
-done = False
-while not done:
-    action = agent.act(state, env.game.get_valid_moves())
-    state, reward, done, info = env.step(action)
-```
-
-## Training Parameters
-
-The DQN agent is configured with the following parameters:
-- Learning rate: 0.001
-- Gamma (discount factor): 0.99
-- Epsilon (exploration rate): 1.0 (decays over time)
-- Memory size: 10,000
-- Batch size: 32
-- Target network update frequency: Every 10 episodes
-
-## Results
-
-The training results, including:
-- Model checkpoints
-- Training history
-- Performance plots
-- Best model
-
-are saved in the `results` directory.
-
-## Contributing
-
-Feel free to submit issues and enhancement requests! 
+The agent typically learns to:
+1. Avoid invalid moves
+2. Keep high-value tiles in corners
+3. Merge similar tiles effectively
+4. Build up to higher numbers systematically 
