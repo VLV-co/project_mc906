@@ -31,15 +31,16 @@ class QTrainer:
         self.lr = lr
         self.gamma = gamma
         self.model = model
+        self.device = next(model.parameters()).device  # Get model's device
         self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
         self.criterion = nn.MSELoss()
 
     def train_step(self, state: torch.Tensor, action: torch.Tensor, reward: torch.Tensor, 
                   next_state: torch.Tensor, done: Tuple[bool, ...]) -> None:
-        state = torch.tensor(state, dtype=torch.float)
-        next_state = torch.tensor(next_state, dtype=torch.float)
-        action = torch.tensor(action, dtype=torch.long)
-        reward = torch.tensor(reward, dtype=torch.float)
+        state = torch.tensor(state, dtype=torch.float).to(self.device)
+        next_state = torch.tensor(next_state, dtype=torch.float).to(self.device)
+        action = torch.tensor(action, dtype=torch.long).to(self.device)
+        reward = torch.tensor(reward, dtype=torch.float).to(self.device)
 
         if len(state.shape) == 1:
             state = torch.unsqueeze(state, 0)

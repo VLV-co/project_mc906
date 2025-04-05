@@ -14,7 +14,9 @@ class Agent:
         self.epsilon_decay: float = 0.995  # Decay rate for exploration
         self.gamma: float = 0.9  # Discount rate
         self.memory: Deque = deque(maxlen=100_000)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = DQN(16, 256, 4)  # Input size: 4x4 board, Output size: 4 directions
+        self.model = self.model.to(self.device)
         self.trainer = QTrainer(self.model, lr=0.001, gamma=self.gamma)
 
     def get_state(self, game: Game2048) -> np.ndarray:
@@ -41,16 +43,41 @@ class Agent:
                          next_state: np.ndarray, done: bool) -> None:
         self.trainer.train_step(state, action, reward, next_state, done)
 
-    def get_action(self, state: np.ndarray) -> List[float]:
+    def get_action(self, state: np.ndarray, game: Game2048 = None, is_testing: bool = False) -> List[float]:
         # Random moves: tradeoff exploration / exploitation
         final_move = [0] * 4
-        if random.random() < self.epsilon:  # Use probability instead of fixed threshold
+        
+        if is_testing and game is not None:
+            # During testing, only consider valid moves
+            valid_moves = []
+            for move in range(4):
+                if game.is_valid_move(move):
+                    valid_moves.append(move)
+            
+            if not valid_moves:
+                # If no valid moves, return any move (game will end anyway)
+                move = random.randint(0, 3)
+            else:
+                state0 = torch.tensor(state, dtype=torch.float).to(self.device)
+                prediction = self.model(state0)
+                prediction = prediction.detach().cpu().numpy()  # Move back to CPU for numpy operations
+                
+                # Filter predictions to only consider valid moves
+                valid_predictions = [(move, prediction[move]) for move in valid_moves]
+                move = max(valid_predictions, key=lambda x: x[1])[0]
+            
+            final_move[move] = 1
+            return final_move
+            
+        # During training, use epsilon-greedy strategy
+        if random.random() < self.epsilon:
             move = random.randint(0, 3)
             final_move[move] = 1
         else:
-            state0 = torch.tensor(state, dtype=torch.float)
+            state0 = torch.tensor(state, dtype=torch.float).to(self.device)
             prediction = self.model(state0)
-            move = torch.argmax(prediction).item()
+            prediction = prediction.detach().cpu().numpy()  # Move back to CPU for numpy operations
+            move = np.argmax(prediction)
             final_move[move] = 1
 
         return final_move 

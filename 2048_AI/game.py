@@ -18,6 +18,19 @@ class Game2048:
         self.cell_size: int = width // self.board_size
         self.margin: int = 10
         
+        # Reward function weights
+        self.alpha: float = 0.4  # Weight for score
+        self.beta: float = 0.3   # Weight for empty cells change
+        self.gamma: float = 0.3  # Weight for highest block change
+        
+        # Reward clipping range
+        self.min_reward: float = -10.0
+        self.max_reward: float = 10.0
+        
+        # Monitoring metrics
+        self.moves_without_merge: int = 0
+        self.max_tile_history: List[int] = []
+        
         pygame.init()
         self.screen = pygame.display.set_mode((width, height))
         pygame.display.set_caption('2048 AI')
@@ -45,6 +58,8 @@ class Game2048:
         self.score: int = 0
         self.game_over: bool = False
         self.frame_iteration: int = 0
+        self.moves_without_merge = 0
+        self.max_tile_history = []
         self._add_new_tile()
         self._add_new_tile()
     
@@ -61,6 +76,17 @@ class Game2048:
             if self._is_valid_move(direction):
                 valid_moves.append(direction)
         return valid_moves
+    
+    def is_valid_move(self, move: int) -> bool:
+        """Check if a move is valid given a move index (0-3).
+        
+        Args:
+            move: Integer representing the move (0: UP, 1: RIGHT, 2: DOWN, 3: LEFT)
+            
+        Returns:
+            bool: True if the move is valid, False otherwise
+        """
+        return self._is_valid_move(Direction(move + 1))
     
     def _is_valid_move(self, direction: Direction) -> bool:
         temp_board = self.board.copy()
@@ -117,7 +143,16 @@ class Game2048:
         
         return score_increase, not np.array_equal(original_board, board)
     
-    def play_step(self, action: List[float]) -> Tuple[int, bool, int]:
+    def _count_empty_cells(self) -> int:
+        return np.count_nonzero(self.board == 0)
+
+    def _get_highest_block(self) -> int:
+        return np.max(self.board)
+
+    def _clip_reward(self, reward: float) -> float:
+        return max(min(reward, self.max_reward), self.min_reward)
+
+    def play_step(self, action: List[float]) -> Tuple[float, bool, int]:
         self.frame_iteration += 1
         
         for event in pygame.event.get():
@@ -126,24 +161,61 @@ class Game2048:
                 quit()
         
         direction = Direction(np.argmax(action) + 1)
-        reward = 0
+        reward = 0.0
         
         if self._is_valid_move(direction):
+            # Store state before move
+            prev_empty_cells = self._count_empty_cells()
+            prev_highest_block = self._get_highest_block()
+            prev_score = self.score
+            
+            # Make move
             score_increase, moved = self._move_tiles(direction, self.board)
+            
             if moved:
-                self.score += int(score_increase)  # Only add integer part to score
-                reward = score_increase  # Keep floating point for reward
+                # Calculate state changes
+                self.score += int(score_increase)
+                curr_empty_cells = self._count_empty_cells()
+                curr_highest_block = self._get_highest_block()
+                
+                # Calculate components of reward
+                score_reward = (self.score - prev_score) / 100.0  # Normalize score
+                empty_cells_reward = (curr_empty_cells - prev_empty_cells) / self.board_size**2
+                highest_block_reward = (curr_highest_block - prev_highest_block) / 2048.0
+                
+                # Calculate total reward using weights
+                reward = (
+                    self.alpha * score_reward +
+                    self.beta * empty_cells_reward +
+                    self.gamma * highest_block_reward
+                )
+                
+                # Update monitoring metrics
+                if curr_highest_block > prev_highest_block:
+                    self.moves_without_merge = 0
+                    self.max_tile_history.append(curr_highest_block)
+                else:
+                    self.moves_without_merge += 1
+                
                 self._add_new_tile()
+            else:
+                reward = -1.0
         else:
-            reward = -10
+            reward = -2.0
         
+        # Check game over conditions
         self.game_over = len(self._get_valid_moves()) == 0
         
         if self.game_over:
-            reward = -10
+            reward = -5.0
         elif np.max(self.board) >= 2048:
-            reward = 100
+            reward = 10.0
             self.game_over = True
+        elif self.moves_without_merge > 20:  # Penalize lack of progress
+            reward -= 1.0
+        
+        # Clip reward to maintain stability
+        reward = self._clip_reward(reward)
         
         self._update_ui()
         return reward, self.game_over, self.score
