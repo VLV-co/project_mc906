@@ -3,6 +3,7 @@ import numpy as np
 from game import Game2048, Direction
 from agent import Agent
 import os
+import time
 
 def test(n_games: int = 10) -> None:
     agent = Agent()
@@ -27,8 +28,7 @@ def test(n_games: int = 10) -> None:
             done = False
 
             while not done:
-                action = agent.get_action(state, game=game, is_testing=True)
-                final_move = agent.get_action(state)
+                final_move = agent.get_action(state, game=game, is_testing=True)
                 reward, done, score = game.play_step(final_move)
                 state = agent.get_state(game)
 
@@ -38,6 +38,7 @@ def test(n_games: int = 10) -> None:
             max_tile = int(np.max(game.board))
 
             print(f"Test Game {i} | Score: {score} | Max Tile: {max_tile}")
+            time.sleep(5)
 
         avg_score = sum(scores) / len(scores)
         print(f"\n--- Test Summary ---")

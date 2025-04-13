@@ -33,7 +33,6 @@ def train() -> None:
 
                 scores.append(score)
                 total_score += score
-                mean_score = total_score / agent.n_games
 
                 print(f'Game {agent.n_games} | Score {score} | Record {record} | Max tile {max_tile} | Epsilon {agent.epsilon:.3f}')
 
