@@ -1,314 +1,306 @@
+import math
 import pygame
 import random
-import numpy as np
-from enum import Enum
-from typing import Tuple, List, Optional
+import sys
 
-class Direction(Enum):
-    UP = 1
-    DOWN = 2
-    LEFT = 3
-    RIGHT = 4
+# Constantes
+GRID_SIZE = 5
+TILE_SIZE = 100
+GAP = 20
+BOARD_WIDTH = GRID_SIZE * (TILE_SIZE + GAP) + GAP
+BOARD_HEIGHT = GRID_SIZE * (TILE_SIZE + GAP) + GAP
+
+PADDING = 100
+WIDTH = HEIGHT = BOARD_WIDTH + PADDING * 2
+
+# Cores
+BACKGROUND_COLOR = (187, 173, 160)
+EMPTY_TILE_COLOR = (205, 193, 180)
+TILE_COLORS = {
+    0: (205, 193, 180), 2: (238, 228, 218), 4: (237, 224, 200),
+    8: (242, 177, 121), 16: (245, 149, 99), 32: (246, 124, 95),
+    64: (246, 94, 59), 128: (237, 207, 114), 256: (237, 204, 97),
+    512: (237, 200, 80), 1024: (237, 197, 63), 2048: (237, 194, 46)}
+TEXT_COLORS = {
+    2: (119, 110, 101), 4: (119, 110, 101), 8: (249, 246, 242),
+    16: (249, 246, 242), 32: (249, 246, 242), 64: (249, 246, 242),
+    128: (249, 246, 242), 256: (249, 246, 242), 512: (249, 246, 242),
+    1024: (249, 246, 242), 2048: (249, 246, 242)}
+
+# Inicialização do pygame
+pygame.init()
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("2048")
+clock = pygame.time.Clock()
+
+# Fontes
+font_label = pygame.font.Font("./fonts/GeistMono-Medium.otf", 20)
+font_normal = pygame.font.Font("./fonts/GeistMono-SemiBold.otf", 24)
+font_bold = pygame.font.Font("./fonts/GeistMono-Bold.otf", 24)
+
+GRID_COORDENATES = [(i, j) for i, cols in enumerate([range(0, 3), range(0, 4), range(0, 5), range(0, 4), range(0, 3)]) for j in cols]
+MAIN_DIAGONAL = [
+    [(0, 2), (1, 3), (2, 4)],
+    [(0, 1), (1, 2), (2, 3), (3, 3)],
+    [(0, 0), (1, 1), (2, 2), (3, 2), (4, 2)],
+    [(1, 0), (2, 1), (3, 1), (4, 1)],
+    [(2, 0), (3, 0), (4, 0)]
+    ]
+SECONDARY_DIAGONAL = [
+    [(0, 0), (1, 0), (2, 0)],
+    [(0, 1), (1, 1), (2, 1), (3, 0)],
+    [(0, 2), (1, 2), (2, 2), (3, 1), (4, 0)],
+    [(1, 3), (2, 3), (3, 2), (4, 1)],
+    [(2, 4), (3, 3), (4, 2)]
+]
 
 class Game2048:
-    def __init__(self, width: int = 400, height: int = 500) -> None:
-        self.width: int = width
-        self.height: int = height
-        self.board_size: int = 4
-        self.cell_size: int = width // self.board_size
-        self.margin: int = 10
-        
-        # Reward function weights
-        self.alpha: float = 0.3  # Weight for score (decreased)
-        self.beta: float = 0.2   # Weight for empty cells change (decreased)
-        self.gamma: float = 0.5  # Weight for highest block change (increased)
-        
-        # Reward clipping range
-        self.min_reward: float = -5.0  # Less penalization
-        self.max_reward: float = 15.0  # More reward for good actions
-        
-        # Monitoring metrics
-        self.moves_without_merge: int = 0
-        self.max_tile_history: List[int] = []
-        self.monotonicity_weight: float = 0.2  # Weight for monotonicity reward
-        
-        pygame.init()
-        self.screen = pygame.display.set_mode((width, height))
-        pygame.display.set_caption('2048 AI')
-        self.font = pygame.font.Font(None, 36)
-        
-        self.colors: dict = {
-            0: (204, 192, 179),
-            2: (238, 228, 218),
-            4: (237, 224, 200),
-            8: (242, 177, 121),
-            16: (245, 149, 99),
-            32: (246, 124, 95),
-            64: (246, 94, 59),
-            128: (237, 207, 114),
-            256: (237, 204, 97),
-            512: (237, 200, 80),
-            1024: (237, 197, 63),
-            2048: (237, 194, 46)
-        }
-        
-        self.reset()
-    
-    def reset(self) -> None:
-        self.board: np.ndarray = np.zeros((self.board_size, self.board_size), dtype=int)
-        self.score: int = 0
-        self.game_over: bool = False
-        self.frame_iteration: int = 0
-        self.moves_without_merge = 0
-        self.max_tile_history = []
-        self._add_new_tile()
-        self._add_new_tile()
-    
-    def _add_new_tile(self) -> None:
-        empty_cells = [(i, j) for i in range(self.board_size) 
-                      for j in range(self.board_size) if self.board[i][j] == 0]
+    def __init__(self):
+        self.grid = [[0 for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+        self.score = 0
+        self.game_over = False
+        self.won = False
+        self.new_tiles = []  # Lista para armazenar novos blocos animados
+        self.add_random_tile()
+        self.add_random_tile()
+
+    def add_random_tile(self):
+        empty_cells = [(i, j) for i, j in GRID_COORDENATES if self.grid[i][j] == 0]
+
         if empty_cells:
             i, j = random.choice(empty_cells)
-            self.board[i][j] = 2 if random.random() < 0.9 else 4
-    
-    def _get_valid_moves(self) -> List[Direction]:
-        valid_moves = []
-        for direction in Direction:
-            if self._is_valid_move(direction):
-                valid_moves.append(direction)
-        return valid_moves
-    
-    def is_valid_move(self, move: int) -> bool:
-        """Check if a move is valid given a move index (0-3).
-        
-        Args:
-            move: Integer representing the move (0: UP, 1: RIGHT, 2: DOWN, 3: LEFT)
-            
-        Returns:
-            bool: True if the move is valid, False otherwise
-        """
-        return self._is_valid_move(Direction(move + 1))
-    
-    def _is_valid_move(self, direction: Direction) -> bool:
-        temp_board = self.board.copy()
-        self._move_tiles(direction, temp_board)
-        return not np.array_equal(temp_board, self.board)
-    
-    def _move_tiles(self, direction: Direction, board: np.ndarray) -> Tuple[int, bool]:
-        score_increase = 0
-        original_board = board.copy()
-        
-        # Rotate board according to direction
-        if direction == Direction.UP:
-            board = np.rot90(board, k=1)  # Rotate 90 degrees clockwise
-        elif direction == Direction.DOWN:
-            board = np.rot90(board, k=3)  # Rotate 270 degrees clockwise
-        elif direction == Direction.RIGHT:
-            board = np.rot90(board, k=2)  # Rotate 180 degrees
-        
-        # Process each row (now they're all effectively moving left)
-        for i in range(board.shape[0]):
-            # Remove zeros and get the non-zero numbers
-            row = board[i][board[i] != 0]
-            
-            # Merge equal adjacent numbers
-            merged_row = []
-            skip_next = False
-            for j in range(len(row)):
-                if skip_next:
-                    skip_next = False
-                    continue
-                if j < len(row) - 1 and row[j] == row[j + 1]:
-                    merged_value = row[j] * 2
-                    merged_row.append(merged_value)
-                    score_increase += merged_value
-                    skip_next = True
-                else:
-                    merged_row.append(row[j])
-            
-            # Pad with zeros to maintain board size
-            merged_row.extend([0] * (board.shape[1] - len(merged_row)))
-            board[i] = merged_row
-        
-        # Rotate back
-        if direction == Direction.UP:
-            board = np.rot90(board, k=3)
-        elif direction == Direction.DOWN:
-            board = np.rot90(board, k=1)
-        elif direction == Direction.RIGHT:
-            board = np.rot90(board, k=2)
-        
-        # Add bonus reward for non-empty tiles
-        n_tiles = np.count_nonzero(board)
-        score_increase += n_tiles * 0.1
-        
-        return score_increase, not np.array_equal(original_board, board)
-    
-    def _count_empty_cells(self) -> int:
-        return np.count_nonzero(self.board == 0)
+            self.grid[i][j] = 2 if random.random() < 0.9 else 4
+            self.new_tiles.append((i, j, pygame.time.get_ticks()))
 
-    def _get_highest_block(self) -> int:
-        return np.max(self.board)
+    def move(self, direction):
+        if self.game_over:
+            return False
 
-    def _clip_reward(self, reward: float) -> float:
-        return max(min(reward, self.max_reward), self.min_reward)
+        moved = False
+        self.new_tiles.clear()
 
-    def _calculate_monotonicity(self) -> float:
-        """Calculate how monotonic the board is (increasing or decreasing values in rows/cols).
-        Returns a value between -1 (worst) and 1 (best).
-        """
-        total_monotonicity = 0.0
-        
-        # Check rows
-        for i in range(self.board_size):
-            row = self.board[i]
-            # Check left-to-right and right-to-left monotonicity
-            left_to_right = sum(1 for j in range(self.board_size-1) if row[j] <= row[j+1] and row[j] != 0)
-            right_to_left = sum(1 for j in range(self.board_size-1) if row[j] >= row[j+1] and row[j+1] != 0)
-            row_monotonicity = max(left_to_right, right_to_left) / (self.board_size - 1)
-            total_monotonicity += row_monotonicity
-            
-        # Check columns
-        for j in range(self.board_size):
-            col = self.board[:, j]
-            # Check top-to-bottom and bottom-to-top monotonicity
-            top_to_bottom = sum(1 for i in range(self.board_size-1) if col[i] <= col[i+1] and col[i] != 0)
-            bottom_to_top = sum(1 for i in range(self.board_size-1) if col[i] >= col[i+1] and col[i+1] != 0)
-            col_monotonicity = max(top_to_bottom, bottom_to_top) / (self.board_size - 1)
-            total_monotonicity += col_monotonicity
-            
-        # Average and normalize to [-1, 1]
-        return (total_monotonicity / (2 * self.board_size)) * 2 - 1
+        if direction == 0: # main diagonal up
+            for k in range(GRID_SIZE):
+                coord = MAIN_DIAGONAL[k]
+                transversal = [self.grid[i][j] for (i,j) in coord]
+                new_transversal, add_score = self._merge(transversal)
+                for l in range(len(transversal)):
+                    if transversal[l] != new_transversal[l]:
+                        moved = True
+                        i, j = coord[l]
+                        self.grid[i][j] = new_transversal[l]
+                self.score += add_score
+        elif direction == 1: # secondary diagonal up
+            for k in range(GRID_SIZE):
+                coord = SECONDARY_DIAGONAL[k]
+                transversal = [self.grid[i][j] for (i,j) in coord]
+                new_transversal, add_score = self._merge(transversal)
+                for l in range(len(transversal)):
+                    if transversal[l] != new_transversal[l]:
+                        moved = True
+                        i, j = coord[l]
+                        self.grid[i][j] = new_transversal[l]
+                self.score += add_score
+        elif direction == 2: # right
+            for k in range(GRID_SIZE):
+                row = [self.grid[i][j] for (i,j) in GRID_COORDENATES if i == k]
+                row.reverse()
+                new_row, add_score = self._merge(row)
+                new_row.reverse()
+                for j in range(len(row)):
+                    if self.grid[k][j] != new_row[j]:
+                        moved = True
+                        self.grid[k][j] = new_row[j]
+                self.score += add_score
+        elif direction == 3: # main diagonal down
+            for k in range(GRID_SIZE):
+                coord = MAIN_DIAGONAL[k]
+                transversal = [self.grid[i][j] for (i,j) in coord]
+                transversal.reverse()
+                new_transversal, add_score = self._merge(transversal)
+                new_transversal.reverse()
+                for l in range(len(transversal)):
+                    i, j = coord[l]
+                    if self.grid[i][j] != new_transversal[l]:
+                        moved = True
+                        self.grid[i][j] = new_transversal[l]
+                self.score += add_score
+        elif direction == 4: # secondary diagonal down
+            for k in range(GRID_SIZE):
+                coord = SECONDARY_DIAGONAL[k]
+                transversal = [self.grid[i][j] for (i,j) in coord]
+                transversal.reverse()
+                new_transversal, add_score = self._merge(transversal)
+                new_transversal.reverse()
+                for l in range(len(transversal)):
+                    i, j = coord[l]
+                    if self.grid[i][j] != new_transversal[l]:
+                        moved = True
+                        self.grid[i][j] = new_transversal[l]
+                self.score += add_score
+        elif direction == 5: # left
+            for k in range(GRID_SIZE):
+                row = [self.grid[i][j] for (i,j) in GRID_COORDENATES if i == k]
+                new_row, add_score = self._merge(row)
+                for j in range(len(row)):
+                    if self.grid[k][j] != new_row[j]:
+                        moved = True
+                        self.grid[k][j] = new_row[j]
+                self.score += add_score
 
-    def play_step(self, action: List[float]) -> Tuple[float, bool, int]:
-        self.frame_iteration += 1
-        
+        if moved:
+            self.add_random_tile()
+            if self._check_win():
+                self.won = True
+            if self._check_game_over():
+                self.game_over = True
+        return moved
+
+    def _merge(self, line):
+        non_zeros = [x for x in line if x != 0]
+        line = non_zeros + [0] * (len(line) - len(non_zeros))
+        score = 0
+        for i in range(len(line) - 1):
+            if line[i] != 0 and line[i] == line[i + 1]:
+                line[i] *= 2
+                score += line[i]
+                line[i + 1] = 0
+        non_zeros = [x for x in line if x != 0]
+        line = non_zeros + [0] * (len(line) - len(non_zeros))
+        return line, score
+
+    def _check_win(self):
+        return any(self.grid[i][j] >= 2048 for i in range(GRID_SIZE) for j in range(GRID_SIZE))
+
+    def _check_game_over(self):
+        for i in range(GRID_SIZE):
+            for j in range(GRID_SIZE):
+                if self.grid[i][j] == 0:
+                    return False
+        for i in range(GRID_SIZE):
+            for j in range(GRID_SIZE - 1):
+                if self.grid[i][j] == self.grid[i][j + 1]:
+                    return False
+        for j in range(GRID_SIZE):
+            for i in range(GRID_SIZE - 1):
+                if self.grid[i][j] == self.grid[i + 1][j]:
+                    return False
+        return True
+
+def draw_tile(surface, value, x, y, scale=1.0):
+    size = int(TILE_SIZE * scale)
+    offset = (TILE_SIZE - size) // 2
+    x += offset
+    y += offset
+
+    pygame.draw.circle(surface, TILE_COLORS.get(value, (237, 160, 20)), (x + size // 2, y + size // 2), size // 2)
+    if value != 0 and scale > 0.7:
+        font_size = 36 if value < 1000 else 24
+        font = pygame.font.Font("./fonts/GeistMono-SemiBold.otf", font_size)
+        text_color = TEXT_COLORS.get(value, (249, 246, 242))
+        text = font.render(str(value), True, text_color)
+        text_rect = text.get_rect(center=(x + size // 2, y + size // 2))
+        surface.blit(text, text_rect)
+
+def draw_board(surface, game, tiles_positions):
+    pygame.draw.rect(surface, BACKGROUND_COLOR, (PADDING, PADDING, BOARD_WIDTH, BOARD_HEIGHT), 0, 10)
+    now = pygame.time.get_ticks()
+    for n, (i, j) in enumerate(GRID_COORDENATES):
+        x, y = tiles_positions[n]
+
+        scale = 1.0
+        for (r, c, start_time) in game.new_tiles:
+            if r == i and c == j:
+                elapsed = now - start_time
+                duration = 200
+                progress = min(elapsed / duration, 1.0)
+                scale = 0.5 + 0.5 * (1 - (1 - progress) ** 2)
+                break
+
+        draw_tile(surface, game.grid[i][j], x + PADDING/2, y + PADDING/2, scale)
+
+    # Score e overlay
+    rect_width, rect_height = 130, 80
+    score_rect = pygame.Rect((WIDTH - rect_width) // 2, 10, rect_width, rect_height)
+    pygame.draw.rect(screen, (119, 110, 101), score_rect, border_radius=16)
+
+    score_label = font_label.render("Score", True, (255, 255, 255))
+    score_value = font_bold.render(str(game.score), True, (255, 255, 255))
+    screen.blit(score_label, (score_rect.centerx - score_label.get_width() // 2, score_rect.y + 10))
+    screen.blit(score_value, (score_rect.centerx - score_value.get_width() // 2, score_rect.y + 40))
+
+    if game.won or game.game_over:
+        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        overlay.fill((255, 255, 255, 150))
+        surface.blit(overlay, (0, 0))
+        font = pygame.font.SysFont("Arial", 48, bold=True)
+        if game.won:
+            text = font.render("You Win!", True, (119, 110, 101))
+        else:
+            text = font.render("Game Over!", True, (119, 110, 101))
+        text_rect = text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50))
+        surface.blit(text, text_rect)
+        font = pygame.font.SysFont("Arial", 24, bold=True)
+        if game.won:
+            msg = font_bold.render("Continue playing? Press 'C'", True, (119, 110, 101))
+        else:
+            msg = font.render("Press 'R' to retry", True, (119, 110, 101))
+        msg_rect = msg.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 20))
+        surface.blit(msg, msg_rect)
+
+def tiles_position(centerX, centerY):
+    positions = [(centerX, centerY)]
+
+    for j in range(1, 3):
+        for i in range(6):
+            angle = i * 60 * (math.pi / 180)
+            x = round(centerX + math.cos(angle) * (TILE_SIZE+GAP) * j, 3)
+            y = round(centerY + math.sin(angle) * (TILE_SIZE+GAP) * j, 3)
+            positions.append((x, y))
+
+    for k in range(6):
+        angle = (30 + k * 60) * (math.pi / 180)
+        x = round(centerX + math.cos(angle) * (TILE_SIZE+GAP) * math.sqrt(3), 3)
+        y = round(centerY + math.sin(angle) * (TILE_SIZE+GAP) * math.sqrt(3), 3)
+        positions.append((x, y))
+
+    return sorted(positions, key=lambda pos: (pos[1], pos[0]))
+
+def main():
+    game = Game2048()
+    running = True
+    tiles_positions = tiles_position(BOARD_WIDTH/2, BOARD_HEIGHT/2)
+
+    while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit()
-                quit()
-        
-        direction = Direction(np.argmax(action) + 1)
-        reward = 0.0
-        
-        if self._is_valid_move(direction):
-            # Store state before move
-            prev_empty_cells = self._count_empty_cells()
-            prev_highest_block = self._get_highest_block()
-            prev_score = self.score
-            prev_monotonicity = self._calculate_monotonicity()
-            
-            # Make move
-            score_increase, moved = self._move_tiles(direction, self.board)
-            
-            if moved:
-                # Calculate state changes
-                self.score += int(score_increase)
-                curr_empty_cells = self._count_empty_cells()
-                curr_highest_block = self._get_highest_block()
-                curr_monotonicity = self._calculate_monotonicity()
-                
-                # Calculate components of reward
-                score_reward = (self.score - prev_score) / 100.0  # Normalize score
-                empty_cells_reward = (curr_empty_cells - prev_empty_cells) / self.board_size**2
-                
-                # Reward exponentially more for higher blocks
-                if curr_highest_block > prev_highest_block:
-                    highest_block_reward = (2 ** (np.log2(curr_highest_block) / 11.0)) - 1
-                else:
-                    highest_block_reward = 0
-                
-                # Reward for improved monotonicity
-                monotonicity_reward = curr_monotonicity - prev_monotonicity
-                
-                # Calculate total reward using weights
-                reward = (
-                    self.alpha * score_reward +
-                    self.beta * empty_cells_reward +
-                    self.gamma * highest_block_reward +
-                    self.monotonicity_weight * monotonicity_reward
-                )
-                
-                # Bonus for merging higher tiles
-                if curr_highest_block > prev_highest_block:
-                    # Exponential reward based on the tile value reached
-                    log_value = np.log2(curr_highest_block)
-                    if log_value >= 8:  # 256 or higher
-                        reward += log_value - 7  # Bonus increases with higher tiles
-                    
-                    self.moves_without_merge = 0
-                    self.max_tile_history.append(curr_highest_block)
-                else:
-                    self.moves_without_merge += 1
-                
-                self._add_new_tile()
-            else:
-                reward = -0.5  # Reduced penalty for invalid moves
-        else:
-            reward = -1.0  # Reduced penalty for invalid moves
-        
-        # Check game over conditions
-        self.game_over = len(self._get_valid_moves()) == 0
-        
-        if self.game_over:
-            # Penalty based on the highest tile achieved
-            max_tile = np.max(self.board)
-            # Scale penalty - lower penalty for higher max tiles
-            if max_tile >= 2048:
-                reward = 20.0  # Big reward for reaching 2048
-            elif max_tile >= 1024:
-                reward = 10.0  # Reward for 1024
-            elif max_tile >= 512:
-                reward = 5.0   # Small reward for 512
-            else:
-                reward = -3.0  # Default penalty
-        elif self.moves_without_merge > 30:  # Increased tolerance for moves without merge
-            reward -= 0.5  # Reduced penalty
-        
-        # Clip reward to maintain stability
-        reward = self._clip_reward(reward)
-        
-        self._update_ui()
-        return reward, self.game_over, self.score
-    
-    def _update_ui(self) -> None:
-        self.screen.fill((187, 173, 160))
-        
-        for i in range(self.board_size):
-            for j in range(self.board_size):
-                value = self.board[i][j]
-                color = self.colors.get(value, (237, 194, 46))
-                
-                rect = pygame.Rect(
-                    j * self.cell_size + self.margin,
-                    i * self.cell_size + self.margin,
-                    self.cell_size - 2 * self.margin,
-                    self.cell_size - 2 * self.margin
-                )
-                pygame.draw.rect(self.screen, color, rect, border_radius=5)
-                
-                if value != 0:
-                    text_surface = self.font.render(str(value), True, (0, 0, 0))
-                    text_rect = text_surface.get_rect(center=rect.center)
-                    self.screen.blit(text_surface, text_rect)
-        
-        score_text = self.font.render(f'Score: {self.score}', True, (0, 0, 0))
-        self.screen.blit(score_text, (10, self.height - 40))
-        
-        pygame.display.flip()
-    
-    def get_state(self) -> np.ndarray:
-        state = []
-        for i in range(self.board_size):
-            for j in range(self.board_size):
-                state.append(self.board[i][j])
-        return np.array(state, dtype=float)
+                running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_r:
+                    game = Game2048()
+                if game.won and event.key == pygame.K_c:
+                    game.won = False
+                if not game.game_over or (game.won and not game.game_over):
+                    if event.key in [pygame.K_w]:
+                        game.move(0)
+                    elif event.key in [pygame.K_e]:
+                        game.move(1)
+                    elif event.key in [pygame.K_d]:
+                        game.move(2)
+                    elif event.key in [pygame.K_x]:
+                        game.move(3)
+                    elif event.key in [pygame.K_z]:
+                        game.move(4)
+                    elif event.key in [pygame.K_a]:
+                        game.move(5)
 
-if __name__ == '__main__':
-    game = Game2048()
-    while True:
-        action = [random.random() for _ in range(4)]
-        reward, game_over, score = game.play_step(action)
-        if game_over:
-            print(f'Game Over! Score: {score}')
-            break 
+        screen.fill((250, 248, 239))
+        draw_board(screen, game, tiles_positions)
+        pygame.display.flip()
+        clock.tick(60)
+
+    pygame.quit()
+    sys.exit()
+
+if __name__ == "__main__":
+    main()
