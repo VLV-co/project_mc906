@@ -4,8 +4,10 @@ import numpy as np
 from typing import Tuple, List
 
 class Game2048:
-    def __init__(self, board_variant = 'square', size = 4):
+    def __init__(self, board_variant = 'square', size = 4, animation = False):
         self.board_variant = board_variant
+        self.animation = animation
+        self.new_tiles = []  # Lista para armazenar novos blocos animados
         if board_variant == 'square' :
             self.direction = {'right': 0, 'left': 1, 'up': 2, 'down': 3}
         else:
@@ -37,7 +39,6 @@ class Game2048:
         self.screen_width = self.board_width + 2 * self.screen_padding
         self.screen_height = self.board_height + 2 * self.screen_padding
 
-        self.new_tiles = []  # Lista para armazenar novos blocos animados
 
         #metrics
         self.moves_without_merge: int = 0
@@ -112,7 +113,7 @@ class Game2048:
         if empty_cells:
             i, j = random.choice(empty_cells)
             self.board[i][j] = 2 if random.random() < 0.9 else 4
-            self.new_tiles.append((i, j, pygame.time.get_ticks()))        
+            if self.animation: self.new_tiles.append((i, j, pygame.time.get_ticks()))        
 
     def _move_tiles(self, direction, board):
         original_board = board.copy()
@@ -285,7 +286,7 @@ class Game2048:
         pygame.display.flip()
 
 if __name__ == '__main__':
-    game = Game2048('hex', 3)  # Change to 'square', 'triangle', or 'hex' as needed
+    game = Game2048('triangle')  # Change to 'square', 'triangle', or 'hex' as needed
 
     while True:
         if not game.game_over:
