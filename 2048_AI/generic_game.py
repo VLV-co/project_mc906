@@ -12,7 +12,7 @@ class Game2048:
             self.direction = {'right': 0, 'left': 1, 'up': 2, 'down': 3}
         else:
             self.direction =  {'right': 0, 'left': 1, 'up_left': 2, 'down_left': 3, 'up_right': 4, 'down_right': 5}
-
+        self.game_over: bool = False
         self.margin: int = 25
         self.yMarginMultiplier = 1 if board_variant == 'square' else 3**-2 / 2
         self.screen_padding: int = 150
@@ -29,7 +29,7 @@ class Game2048:
             1024: (249, 246, 242), 2048: (249, 246, 242)}
 
         self.board_coordinates = []
-        if(board_variant != 'hex'):
+        if board_variant != 'hex':
             self.grid_size = size
         else:
             self.grid_size = size * 2 - 1
@@ -39,8 +39,12 @@ class Game2048:
         self.screen_width = self.board_width + 2 * self.screen_padding
         self.screen_height = self.board_height + 2 * self.screen_padding
 
+<<<<<<< HEAD
+=======
+        self.new_tiles = []
+>>>>>>> 7fab1882210c5be3ffd86edd619f4dc753b98d8e
 
-        #metrics
+        # Metrics
         self.moves_without_merge: int = 0
         self.max_tile_history: List[int] = []
 
@@ -71,6 +75,7 @@ class Game2048:
                 self.tiles_position.append((x, y))
 
     def reset(self) -> None:
+        self.board_coordinates.clear()
         self.board = [['x' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
         self.board_init()
         self.board = np.array(self.board, dtype=object)
@@ -159,26 +164,24 @@ class Game2048:
 
     def merge_left(self,board):
         for i in range(len(board[0])): 
-                row, score = self.merge(board[i])
+            row, score = self.merge(board[i])
 
-                while len(row) < len([v for v in board[i] if v != 'x']):
-                    row.append(0)
+            while len(row) < len([v for v in board[i] if v != 'x']):
+                row.append(0)
 
-                result = []
-                valid_idx = 0
-                for v in board[i]:
-                    if v == 'x':
-                        result.append('x')
-                    else:
-                        result.append(row[valid_idx])
-                        valid_idx += 1
-                board[i] = result
+            result = []
+            valid_idx = 0
+            for v in board[i]:
+                if v == 'x':
+                    result.append('x')
+                else:
+                    result.append(row[valid_idx])
+                    valid_idx += 1
+            board[i] = result
 
         return score
 
     def mirror(self, board):
-        n = len(board[0])
-
         for i, row in enumerate(board):
             # Extrai os valores não-'x' e seus índices
             values = [v for v in row if v != 'x'][::-1]
@@ -203,8 +206,9 @@ class Game2048:
 
         return new_row, score
 
-    def _get_highest_block(self) -> int:
-        return np.max(self.board)
+    def get_max_tile(self) -> int:
+        """Returns the highest tile currently on the board."""
+        return int(np.max(self.board[self.board != 'x']))
     
     def _has_empty_cells(self) -> int:
         for row in self.board:
@@ -279,7 +283,7 @@ class Game2048:
         pygame.draw.rect(self.screen, (119, 110, 101), score_rect, border_radius=16)
 
         score_label = self.font_label.render("Score", True, (255, 255, 255))
-        score_value = self.font_bold.render(str(game.score), True, (255, 255, 255))
+        score_value = self.font_bold.render(str(self.score), True, (255, 255, 255))
         self.screen.blit(score_label, (score_rect.centerx - score_label.get_width() // 2, score_rect.y + 10))
         self.screen.blit(score_value, (score_rect.centerx - score_value.get_width() // 2, score_rect.y + 40))
 
