@@ -1,306 +1,321 @@
-import math
 import pygame
 import random
-import sys
-
-# Constantes
-GRID_SIZE = 5
-TILE_SIZE = 100
-GAP = 20
-BOARD_WIDTH = GRID_SIZE * (TILE_SIZE + GAP) + GAP
-BOARD_HEIGHT = GRID_SIZE * (TILE_SIZE + GAP) + GAP
-
-PADDING = 100
-WIDTH = HEIGHT = BOARD_WIDTH + PADDING * 2
-
-# Cores
-BACKGROUND_COLOR = (187, 173, 160)
-EMPTY_TILE_COLOR = (205, 193, 180)
-TILE_COLORS = {
-    0: (205, 193, 180), 2: (238, 228, 218), 4: (237, 224, 200),
-    8: (242, 177, 121), 16: (245, 149, 99), 32: (246, 124, 95),
-    64: (246, 94, 59), 128: (237, 207, 114), 256: (237, 204, 97),
-    512: (237, 200, 80), 1024: (237, 197, 63), 2048: (237, 194, 46)}
-TEXT_COLORS = {
-    2: (119, 110, 101), 4: (119, 110, 101), 8: (249, 246, 242),
-    16: (249, 246, 242), 32: (249, 246, 242), 64: (249, 246, 242),
-    128: (249, 246, 242), 256: (249, 246, 242), 512: (249, 246, 242),
-    1024: (249, 246, 242), 2048: (249, 246, 242)}
-
-# Inicialização do pygame
-pygame.init()
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("2048")
-clock = pygame.time.Clock()
-
-# Fontes
-font_label = pygame.font.Font("./fonts/GeistMono-Medium.otf", 20)
-font_normal = pygame.font.Font("./fonts/GeistMono-SemiBold.otf", 24)
-font_bold = pygame.font.Font("./fonts/GeistMono-Bold.otf", 24)
-
-GRID_COORDENATES = [(i, j) for i, cols in enumerate([range(0, 3), range(0, 4), range(0, 5), range(0, 4), range(0, 3)]) for j in cols]
-MAIN_DIAGONAL = [
-    [(0, 2), (1, 3), (2, 4)],
-    [(0, 1), (1, 2), (2, 3), (3, 3)],
-    [(0, 0), (1, 1), (2, 2), (3, 2), (4, 2)],
-    [(1, 0), (2, 1), (3, 1), (4, 1)],
-    [(2, 0), (3, 0), (4, 0)]
-    ]
-SECONDARY_DIAGONAL = [
-    [(0, 0), (1, 0), (2, 0)],
-    [(0, 1), (1, 1), (2, 1), (3, 0)],
-    [(0, 2), (1, 2), (2, 2), (3, 1), (4, 0)],
-    [(1, 3), (2, 3), (3, 2), (4, 1)],
-    [(2, 4), (3, 3), (4, 2)]
-]
+import numpy as np
+from typing import Tuple, List
 
 class Game2048:
-    def __init__(self):
-        self.grid = [[0 for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
-        self.score = 0
-        self.game_over = False
-        self.won = False
+    def __init__(self, board_variant = 'square', size = 4, animation = False):
+        self.board_variant = board_variant
+        self.animation = animation
         self.new_tiles = []  # Lista para armazenar novos blocos animados
-        self.add_random_tile()
-        self.add_random_tile()
+        if board_variant == 'square' :
+            self.direction = {'right': 0, 'left': 1, 'up': 2, 'down': 3}
+        else:
+            self.direction =  {'right': 0, 'left': 1, 'up_left': 2, 'down_left': 3, 'up_right': 4, 'down_right': 5}
+        self.game_over: bool = False
+        self.margin: int = 25
+        self.yMarginMultiplier = 1 if board_variant == 'square' else 3**-2 / 2
+        self.screen_padding: int = 150
+        self.tile_size: int = 100
+        self.colors = {
+            0: (205, 193, 180), 2: (238, 228, 218), 4: (237, 224, 200),
+            8: (242, 177, 121), 16: (245, 149, 99), 32: (246, 124, 95),
+            64: (246, 94, 59), 128: (237, 207, 114), 256: (237, 204, 97),
+            512: (237, 200, 80), 1024: (237, 197, 63), 2048: (237, 194, 46)}
+        self.text_colors = {
+            2: (119, 110, 101), 4: (119, 110, 101), 8: (249, 246, 242),
+            16: (249, 246, 242), 32: (249, 246, 242), 64: (249, 246, 242),
+            128: (249, 246, 242), 256: (249, 246, 242), 512: (249, 246, 242),
+            1024: (249, 246, 242), 2048: (249, 246, 242)}
 
-    def add_random_tile(self):
-        empty_cells = [(i, j) for i, j in GRID_COORDENATES if self.grid[i][j] == 0]
+        self.board_coordinates = []
+        if board_variant != 'hex':
+            self.grid_size = size
+        else:
+            self.grid_size = size * 2 - 1
 
+        self.board_width =  self.grid_size * self.tile_size + (self.grid_size + 1) * self.margin
+        self.board_height = self.grid_size * self.tile_size + (self.grid_size - 1) * self.margin * self.yMarginMultiplier + 2 * self.margin 
+        self.screen_width = self.board_width + 2 * self.screen_padding
+        self.screen_height = self.board_height + 2 * self.screen_padding
+
+        self.new_tiles = []
+
+        # Metrics
+        self.moves_without_merge: int = 0
+        self.max_tile_history: List[int] = []
+
+        pygame.init()
+        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+        pygame.display.set_caption(f"2048* AI - {board_variant} board")
+        self.font_normal = pygame.font.Font("./fonts/GeistMono-SemiBold.otf", 24)
+        self.font_label = pygame.font.Font("./fonts/GeistMono-Medium.otf", 20)
+        self.font_bold = pygame.font.Font("./fonts/GeistMono-Bold.otf", 24)
+
+        self.reset()
+        self._tiles_position()
+
+    def _tiles_position(self):
+        self.tiles_position = []
+        self.tiles_per_row = [0] * (self.grid_size)
+
+        for i, j in self.board_coordinates:
+            self.tiles_per_row[i] += 1
+
+        for row in range(self.grid_size):
+            n_tiles = self.tiles_per_row[row]
+            row_width = n_tiles * self.tile_size + (n_tiles - 1) * self.margin
+            start_x = (self.screen_width - row_width) // 2
+            for col in range(n_tiles):
+                x = start_x + col * (self.tile_size + self.margin)
+                y = self.screen_padding + row * (self.tile_size + self.margin * self.yMarginMultiplier) + self.margin
+                self.tiles_position.append((x, y))
+
+    def reset(self) -> None:
+        self.board_coordinates.clear()
+        self.board = [['x' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
+        self.board_init()
+        self.board = np.array(self.board, dtype=object)
+        self.score: int = 0
+        self.game_over: bool = False
+        self.game_over_time = None 
+        self.moves_without_merge = 0
+        self.max_tile_history = []
+        self._add_new_tile()
+        self._add_new_tile()    
+
+    def board_init(self):
+        if self.board_variant == 'triangle':
+            for i in range(self.grid_size):
+                for j in range(i + 1):
+                    self.board[i][j] = 0
+                    self.board_coordinates.append((i, j))
+        elif self.board_variant == 'hex':
+            size = (self.grid_size + 1) // 2
+            for i in range(size, self.grid_size):
+                for j in range(i):
+                    self.board[i - size][j] = 0
+                    self.board[size * 3 - 2 - i][self.grid_size - j - 1] = 0
+                    self.board_coordinates.append((i - size, j))
+                    self.board_coordinates.append((size * 3 - 2 - i, self.grid_size - j - 1))
+
+            for k in range(self.grid_size):
+                self.board[size - 1][k] = 0
+                self.board_coordinates.append((size - 1, k))
+
+            self.board_coordinates = sorted(self.board_coordinates, key=lambda pos: (pos[0], pos[1]))
+        else:
+            for i in range(self.grid_size):
+                for j in range(self.grid_size):
+                    self.board[i][j] = 0
+                    self.board_coordinates.append((i, j))
+
+    def _add_new_tile(self) -> None:
+        empty_cells = [(i, j) for i, j in self.board_coordinates if self.board[i][j] == 0]
         if empty_cells:
             i, j = random.choice(empty_cells)
-            self.grid[i][j] = 2 if random.random() < 0.9 else 4
-            self.new_tiles.append((i, j, pygame.time.get_ticks()))
+            self.board[i][j] = 2 if random.random() < 0.9 else 4
+            if self.animation: self.new_tiles.append((i, j, pygame.time.get_ticks()))        
 
-    def move(self, direction):
-        if self.game_over:
-            return False
+    def _move_tiles(self, direction, board):
+        original_board = board.copy()
+            
+        if direction == self.direction['left']:
+            score = self.merge_left(board)
+        elif direction == self.direction['right']:
+            board = np.fliplr(board)
+            score = self.merge_left(board) 
+            board = np.fliplr(board)
+        elif self.board_variant == 'square':
+            if direction == self.direction['up']:
+                board = np.rot90(board)
+                score = self.merge_left(board) 
+                board = np.rot90(board, k=3)
+            elif direction == self.direction['down']:
+                board = np.rot90(board, k=3)
+                score = self.merge_left(board) 
+                board = np.rot90(board)
+        else:
+            if direction == self.direction['up_left']:
+                self.mirror(board)
+                board = np.rot90(board)
+                score = self.merge_left(board) 
+                board = np.rot90(board, k=3)
+                self.mirror(board)
+            elif direction == self.direction['down_left']:
+                self.mirror(board)
+                board = np.rot90(board, k=3)
+                score = self.merge_left(board) 
+                board = np.rot90(board)
+                self.mirror(board)
+            elif direction == self.direction['up_right']:
+                board = np.rot90(board)
+                score = self.merge_left(board) 
+                board = np.rot90(board, k=3)
+            elif direction == self.direction['down_right']:
+                board = np.rot90(board, k=3)
+                score = self.merge_left(board) 
+                board = np.rot90(board)
 
-        moved = False
-        self.new_tiles.clear()
+        return score, not np.array_equal(original_board, board)  
 
-        if direction == 0: # main diagonal up
-            for k in range(GRID_SIZE):
-                coord = MAIN_DIAGONAL[k]
-                transversal = [self.grid[i][j] for (i,j) in coord]
-                new_transversal, add_score = self._merge(transversal)
-                for l in range(len(transversal)):
-                    if transversal[l] != new_transversal[l]:
-                        moved = True
-                        i, j = coord[l]
-                        self.grid[i][j] = new_transversal[l]
-                self.score += add_score
-        elif direction == 1: # secondary diagonal up
-            for k in range(GRID_SIZE):
-                coord = SECONDARY_DIAGONAL[k]
-                transversal = [self.grid[i][j] for (i,j) in coord]
-                new_transversal, add_score = self._merge(transversal)
-                for l in range(len(transversal)):
-                    if transversal[l] != new_transversal[l]:
-                        moved = True
-                        i, j = coord[l]
-                        self.grid[i][j] = new_transversal[l]
-                self.score += add_score
-        elif direction == 2: # right
-            for k in range(GRID_SIZE):
-                row = [self.grid[i][j] for (i,j) in GRID_COORDENATES if i == k]
-                row.reverse()
-                new_row, add_score = self._merge(row)
-                new_row.reverse()
-                for j in range(len(row)):
-                    if self.grid[k][j] != new_row[j]:
-                        moved = True
-                        self.grid[k][j] = new_row[j]
-                self.score += add_score
-        elif direction == 3: # main diagonal down
-            for k in range(GRID_SIZE):
-                coord = MAIN_DIAGONAL[k]
-                transversal = [self.grid[i][j] for (i,j) in coord]
-                transversal.reverse()
-                new_transversal, add_score = self._merge(transversal)
-                new_transversal.reverse()
-                for l in range(len(transversal)):
-                    i, j = coord[l]
-                    if self.grid[i][j] != new_transversal[l]:
-                        moved = True
-                        self.grid[i][j] = new_transversal[l]
-                self.score += add_score
-        elif direction == 4: # secondary diagonal down
-            for k in range(GRID_SIZE):
-                coord = SECONDARY_DIAGONAL[k]
-                transversal = [self.grid[i][j] for (i,j) in coord]
-                transversal.reverse()
-                new_transversal, add_score = self._merge(transversal)
-                new_transversal.reverse()
-                for l in range(len(transversal)):
-                    i, j = coord[l]
-                    if self.grid[i][j] != new_transversal[l]:
-                        moved = True
-                        self.grid[i][j] = new_transversal[l]
-                self.score += add_score
-        elif direction == 5: # left
-            for k in range(GRID_SIZE):
-                row = [self.grid[i][j] for (i,j) in GRID_COORDENATES if i == k]
-                new_row, add_score = self._merge(row)
-                for j in range(len(row)):
-                    if self.grid[k][j] != new_row[j]:
-                        moved = True
-                        self.grid[k][j] = new_row[j]
-                self.score += add_score
+    def merge_left(self,board):
+        for i in range(len(board[0])): 
+            row, score = self.merge(board[i])
 
-        if moved:
-            self.add_random_tile()
-            if self._check_win():
-                self.won = True
-            if self._check_game_over():
-                self.game_over = True
-        return moved
+            while len(row) < len([v for v in board[i] if v != 'x']):
+                row.append(0)
 
-    def _merge(self, line):
-        non_zeros = [x for x in line if x != 0]
-        line = non_zeros + [0] * (len(line) - len(non_zeros))
+            result = []
+            valid_idx = 0
+            for v in board[i]:
+                if v == 'x':
+                    result.append('x')
+                else:
+                    result.append(row[valid_idx])
+                    valid_idx += 1
+            board[i] = result
+
+        return score
+
+    def mirror(self, board):
+        for i, row in enumerate(board):
+            # Extrai os valores não-'x' e seus índices
+            values = [v for v in row if v != 'x'][::-1]
+            indices = [j for j, v in enumerate(row) if v != 'x']
+
+            # Sobrescreve a linha diretamente
+            for j, val in zip(indices, values):
+                row[j] = val
+
+    def merge(self, row: List[int]) -> Tuple[List[int], int]:
+        new_row = [tile for tile in row if tile != 0 and tile != 'x']
         score = 0
-        for i in range(len(line) - 1):
-            if line[i] != 0 and line[i] == line[i + 1]:
-                line[i] *= 2
-                score += line[i]
-                line[i + 1] = 0
-        non_zeros = [x for x in line if x != 0]
-        line = non_zeros + [0] * (len(line) - len(non_zeros))
-        return line, score
+        i = 0
+        while i < len(new_row) - 1:
+            if new_row[i] == new_row[i + 1]:
+                new_row[i] *= 2
+                score += new_row[i]
+                del new_row[i + 1]
+                # não incrementa i, pois o próximo item mudou de posição
+            else:
+                i += 1
 
-    def _check_win(self):
-        return any(self.grid[i][j] >= 2048 for i in range(GRID_SIZE) for j in range(GRID_SIZE))
+        return new_row, score
 
-    def _check_game_over(self):
-        for i in range(GRID_SIZE):
-            for j in range(GRID_SIZE):
-                if self.grid[i][j] == 0:
-                    return False
-        for i in range(GRID_SIZE):
-            for j in range(GRID_SIZE - 1):
-                if self.grid[i][j] == self.grid[i][j + 1]:
-                    return False
-        for j in range(GRID_SIZE):
-            for i in range(GRID_SIZE - 1):
-                if self.grid[i][j] == self.grid[i + 1][j]:
-                    return False
-        return True
+    def get_max_tile(self) -> int:
+        """Returns the highest tile currently on the board."""
+        return int(np.max(self.board[self.board != 'x']))
+    
+    def _has_empty_cells(self) -> int:
+        for row in self.board:
+            if 0 in row:
+                return True
+        return False
 
-def draw_tile(surface, value, x, y, scale=1.0):
-    size = int(TILE_SIZE * scale)
-    offset = (TILE_SIZE - size) // 2
-    x += offset
-    y += offset
+    def _has_valid_moves(self):
+        for direction in self.direction.values():
+            if self._is_valid_move(direction):
+                return True
+        return False
 
-    pygame.draw.circle(surface, TILE_COLORS.get(value, (237, 160, 20)), (x + size // 2, y + size // 2), size // 2)
-    if value != 0 and scale > 0.7:
-        font_size = 36 if value < 1000 else 24
-        font = pygame.font.Font("./fonts/GeistMono-SemiBold.otf", font_size)
-        text_color = TEXT_COLORS.get(value, (249, 246, 242))
-        text = font.render(str(value), True, text_color)
-        text_rect = text.get_rect(center=(x + size // 2, y + size // 2))
-        surface.blit(text, text_rect)
+    def _is_valid_move(self, direction) -> bool:
+        temp_board = self.board.copy()
+        self._move_tiles(direction, temp_board)
+        return not np.array_equal(temp_board, self.board)
+    
+    def play_step(self, direction) -> Tuple[bool, int]:        
+        score_increase, moved = self._move_tiles(direction, self.board)
+        if moved:
+            self.score += score_increase
+            self.new_tiles.clear()
+            self._add_new_tile()
+            self.draw_board()
 
-def draw_board(surface, game, tiles_positions):
-    pygame.draw.rect(surface, BACKGROUND_COLOR, (PADDING, PADDING, BOARD_WIDTH, BOARD_HEIGHT), 0, 10)
-    now = pygame.time.get_ticks()
-    for n, (i, j) in enumerate(GRID_COORDENATES):
-        x, y = tiles_positions[n]
-
-        scale = 1.0
-        for (r, c, start_time) in game.new_tiles:
-            if r == i and c == j:
-                elapsed = now - start_time
-                duration = 200
-                progress = min(elapsed / duration, 1.0)
-                scale = 0.5 + 0.5 * (1 - (1 - progress) ** 2)
-                break
-
-        draw_tile(surface, game.grid[i][j], x + PADDING/2, y + PADDING/2, scale)
-
-    # Score e overlay
-    rect_width, rect_height = 130, 80
-    score_rect = pygame.Rect((WIDTH - rect_width) // 2, 10, rect_width, rect_height)
-    pygame.draw.rect(screen, (119, 110, 101), score_rect, border_radius=16)
-
-    score_label = font_label.render("Score", True, (255, 255, 255))
-    score_value = font_bold.render(str(game.score), True, (255, 255, 255))
-    screen.blit(score_label, (score_rect.centerx - score_label.get_width() // 2, score_rect.y + 10))
-    screen.blit(score_value, (score_rect.centerx - score_value.get_width() // 2, score_rect.y + 40))
-
-    if game.won or game.game_over:
-        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-        overlay.fill((255, 255, 255, 150))
-        surface.blit(overlay, (0, 0))
-        font = pygame.font.SysFont("Arial", 48, bold=True)
-        if game.won:
-            text = font.render("You Win!", True, (119, 110, 101))
+        if not self._has_empty_cells():
+            if not self._has_valid_moves():
+                self.game_over = True
+                self.game_over_time = pygame.time.get_ticks()
         else:
-            text = font.render("Game Over!", True, (119, 110, 101))
-        text_rect = text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50))
-        surface.blit(text, text_rect)
-        font = pygame.font.SysFont("Arial", 24, bold=True)
-        if game.won:
-            msg = font_bold.render("Continue playing? Press 'C'", True, (119, 110, 101))
-        else:
-            msg = font.render("Press 'R' to retry", True, (119, 110, 101))
-        msg_rect = msg.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 20))
-        surface.blit(msg, msg_rect)
+            self.game_over = False
 
-def tiles_position(centerX, centerY):
-    positions = [(centerX, centerY)]
 
-    for j in range(1, 3):
-        for i in range(6):
-            angle = i * 60 * (math.pi / 180)
-            x = round(centerX + math.cos(angle) * (TILE_SIZE+GAP) * j, 3)
-            y = round(centerY + math.sin(angle) * (TILE_SIZE+GAP) * j, 3)
-            positions.append((x, y))
+        return self.game_over, self.score
+    
+    def _draw_tile(self, surface, value, i, scale=1.0):
+        size = int(self.tile_size * scale)
+        offset = (self.tile_size - size) // 2
+        x = self.tiles_position[i][0] + offset
+        y = self.tiles_position[i][1] + offset
 
-    for k in range(6):
-        angle = (30 + k * 60) * (math.pi / 180)
-        x = round(centerX + math.cos(angle) * (TILE_SIZE+GAP) * math.sqrt(3), 3)
-        y = round(centerY + math.sin(angle) * (TILE_SIZE+GAP) * math.sqrt(3), 3)
-        positions.append((x, y))
+        pygame.draw.circle(surface, self.colors.get(value, (237, 160, 20)), (x + size // 2, y + size // 2), size // 2)
+        if value != 0 and scale > 0.7:
+            font_size = 36 if value < 1000 else 24
+            font = pygame.font.Font("./fonts/GeistMono-SemiBold.otf", font_size)
+            text = font.render(str(value), True, self.text_colors.get(value, (255, 255, 255)))
+            text_rect = text.get_rect(center=(x + size // 2, y + size // 2))
+            surface.blit(text, text_rect)
 
-    return sorted(positions, key=lambda pos: (pos[1], pos[0]))
+    def draw_board(self):
+        now = pygame.time.get_ticks()
 
-def main():
-    game = Game2048()
-    running = True
-    tiles_positions = tiles_position(BOARD_WIDTH/2, BOARD_HEIGHT/2)
+        self.screen.fill((250, 248, 239))
+        pygame.draw.rect(self.screen, (187, 173, 160), (self.screen_padding, self.screen_padding, self.board_width , self.board_height), 0, 10)
 
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_r:
-                    game = Game2048()
-                if game.won and event.key == pygame.K_c:
-                    game.won = False
-                if not game.game_over or (game.won and not game.game_over):
-                    if event.key in [pygame.K_w]:
-                        game.move(0)
-                    elif event.key in [pygame.K_e]:
-                        game.move(1)
-                    elif event.key in [pygame.K_d]:
-                        game.move(2)
-                    elif event.key in [pygame.K_x]:
-                        game.move(3)
-                    elif event.key in [pygame.K_z]:
-                        game.move(4)
-                    elif event.key in [pygame.K_a]:
-                        game.move(5)
+        for n, (i, j) in enumerate(self.board_coordinates):
+            scale = 1.0
+            for (a, b, start_time) in self.new_tiles:
+                if a == i and b == j:
+                    elapsed = now - start_time
+                    duration = 200
+                    progress = min(elapsed / duration, 1.0)
+                    scale = 0.5 + 0.5 * (1 - (1 - progress) ** 2)
+                    break
 
-        screen.fill((250, 248, 239))
-        draw_board(screen, game, tiles_positions)
+            self._draw_tile(self.screen, self.board[i][j], n, scale)
+
+        # Score e overlay
+        rect_width, rect_height = 130, 80
+        score_rect = pygame.Rect((self.screen_width - rect_width) // 2, 10, rect_width, rect_height)
+        pygame.draw.rect(self.screen, (119, 110, 101), score_rect, border_radius=16)
+
+        score_label = self.font_label.render("Score", True, (255, 255, 255))
+        score_value = self.font_bold.render(str(self.score), True, (255, 255, 255))
+        self.screen.blit(score_label, (score_rect.centerx - score_label.get_width() // 2, score_rect.y + 10))
+        self.screen.blit(score_value, (score_rect.centerx - score_value.get_width() // 2, score_rect.y + 40))
+
         pygame.display.flip()
-        clock.tick(60)
 
-    pygame.quit()
-    sys.exit()
+if __name__ == '__main__':
+    game = Game2048('triangle')  # Change to 'square', 'triangle', or 'hex' as needed
 
-if __name__ == "__main__":
-    main()
+    while True:
+        if not game.game_over:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    quit()
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_r:
+                        game.reset()
+                    elif event.key in [pygame.K_w]:
+                        game.play_step(2)
+                    elif event.key in [pygame.K_e]:
+                        game.play_step(4)
+                    elif event.key in [pygame.K_d]:
+                        game.play_step(0)
+                    elif event.key in [pygame.K_x]:
+                        game.play_step(3)
+                    elif event.key in [pygame.K_z]:
+                        game.play_step(5)
+                    elif event.key in [pygame.K_a]:
+                        game.play_step(1)
+                    elif event.key in [pygame.K_s]:
+                        game.play_step(3)
+
+        game.draw_board()
+        if game.game_over:
+            print(f'Game Over! Score: {game.score}')
+            if pygame.time.get_ticks() - game.game_over_time > 5000:
+                game.reset()
+        pygame.time.Clock().tick(60) 

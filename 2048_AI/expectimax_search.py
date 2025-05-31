@@ -4,7 +4,7 @@ from typing import Literal
 import numpy as np
 import pygame
 
-from generic_game import Game2048
+from game import Game2048
 
 class ExpectiMaxSearch:
     """Agent that plays 2048 using the Expectimax search algorithm."""

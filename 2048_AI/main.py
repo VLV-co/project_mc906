@@ -7,7 +7,7 @@ from typing import Dict, Optional
 import pandas as pd
 
 from expectimax_search import ExpectiMaxSearch
-from generic_game import Game2048
+from game import Game2048
 
 def parse_args() -> argparse.Namespace:
     """
