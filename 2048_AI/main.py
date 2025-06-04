@@ -159,7 +159,7 @@ def main():
                 f"Average move time: {result['avg_move_time_sec']:>7.4f}s"
             )
 
-    pd.DataFrame(game_data).to_csv(os.path.join(log_dir, "summary.csv"), index=False)
+            pd.DataFrame(game_data).to_csv(os.path.join(log_dir, "summary.csv"), index=False)
 
 if __name__ == "__main__":
     main()
