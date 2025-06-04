@@ -65,7 +65,7 @@ def play_game(
 
     agent = None
     if agent_type == "expectimax":
-        agent = ExpectiMaxSearch(game_instance=game, max_depth=depth, heuristic=heuristic)
+        agent = ExpectiMaxSearch(game_instance=game, max_depth=depth, heuristic=heuristic, num_processes=6)
 
     while not game.game_over:
         start_time = time.time()

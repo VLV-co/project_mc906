@@ -13,7 +13,7 @@ SIZE=$2
 
 # Run for expectimax agent with all heuristics and depths
 for HEURISTIC in empty_cells snake; do
-    for DEPTH in 2 3 4 5; do
+    for DEPTH in 5; do
         python3 main.py \
             -agent expectimax \
             -heuristic $HEURISTIC \
