@@ -1,0 +1,81 @@
+
+\documentclass[12pt]{article}
+\usepackage{amsmath,amsfonts}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\geometry{margin=1in}
+
+\title{A Formal Metric for Estimating the Relative Difficulty of 2048 Game Topologies}
+\author{Luiz Guilherme Sousa Nascimento}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{1. Introduction}
+We aim to define a relative difficulty metric for variants of the 2048 game played on different board topologies. The metric should account for empirical performance, board structure, and stochastic variance, enabling predictive comparisons.
+
+\section*{2. Problem Setting}
+Let $G = (V, E)$ represent the game board as a graph with:
+\begin{itemize}
+  \item $N = |V|$: number of cells
+  \item $D$: number of move directions
+  \item $\bar{d}$: average node degree (connectivity)
+\end{itemize}
+
+Let $T_{\text{max}}$ be the highest tile achieved in a game, and $X = \log_2(T_{\text{max}})$ its log-transformed value. Denote:
+\[
+\mathbb{E}[X] \quad \text{and} \quad \sigma = \sqrt{\mathrm{Var}(X)}
+\]
+as the mean and standard deviation across many games on the same topology.
+
+\section*{3. Structural Factors}
+More cells ($N$), directions ($D$), and connectivity ($\bar{d}$) yield greater maneuverability. We define:
+\[
+f(N, D, \bar{d}) = N + \alpha D + \beta \bar{d}
+\]
+with $\alpha, \beta \geq 0$ expressing the influence of movement and connectivity.
+
+\section*{4. Performance Term with Variance Penalty}
+Given the stochastic nature of tile spawns and movement, we define an effective performance measure:
+\[
+\Phi = \mathbb{E}[X] \cdot (1 + \mu \cdot \sigma)
+\]
+where $\mu \geq 0$ penalizes high variance as a sign of unstable strategies.
+
+\section*{5. Tile Generation Probabilities}
+Let $P_2, P_4$ be the probabilities of spawning tiles 2 and 4. Then:
+\[
+\mathbb{E}[T_{\text{new}}] = 2P_2 + 4P_4, \quad \mathcal{P} = \frac{1}{\mathbb{E}[T_{\text{new}}]}
+\]
+
+\section*{6. Optional Entropy Term}
+To capture uncertainty in future board states, we may define:
+\[
+H = -\sum_i p_i \log p_i, \quad \text{and} \quad (1 + \lambda H)
+\]
+
+\section*{7. Final Difficulty Metric}
+We define the relative difficulty as:
+\[
+\boxed{
+\mathcal{D}_{\text{topo}} = \frac{f(N, D, \bar{d})}{\Phi} \cdot \mathcal{P} \cdot (1 + \lambda H)
+}
+\quad \text{with} \quad \Phi = \mathbb{E}[\log_2(T_{\text{max}})] \cdot (1 + \mu \cdot \sigma)
+\]
+
+\section*{8. Predicting for New Topologies}
+Given a baseline $\mathcal{D}_{\text{ref}}$ and a new topology $(N', D', \bar{d}')$:
+\[
+\Phi_{\text{new}} \approx \frac{f(N', D', \bar{d}')}{\mathcal{D}_{\text{ref}}} \cdot \mathcal{P}_{\text{new}} \cdot (1 + \lambda H + \mu \sigma)
+\]
+and:
+\[
+\mathbb{E}[\log_2(T_{\text{max,new}})] \approx \frac{\Phi_{\text{new}}}{1 + \mu \cdot \sigma}
+\]
+
+\section*{9. Conclusion}
+This formulation enables principled comparisons between different 2048 topologies. It accounts for spatial capacity, mobility, randomness, and observed empirical performance.
+
+\end{document}
