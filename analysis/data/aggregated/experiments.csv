@@ -1,0 +1,16 @@
+topology,cells_number,possible_moves,connection_degree,depth,mean_log2_max_tile
+hex,19,6,4.11,2,11.275
+hex,19,6,4.11,1,11.105
+hex,19,6,4.11,4,13.065
+hex,19,6,4.11,3,13.13
+hex,19,6,4.11,0,9.12
+square,16,4,3.0,3,9.875
+square,16,4,3.0,4,9.84
+square,16,4,3.0,2,7.685
+square,16,4,3.0,1,7.495
+square,16,4,3.0,0,6.63
+triangle,10,6,3.0,4,8.32
+triangle,10,6,3.0,2,7.475
+triangle,10,6,3.0,3,8.31
+triangle,10,6,3.0,0,6.0
+triangle,10,6,3.0,1,7.455
