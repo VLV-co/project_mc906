@@ -10,7 +10,7 @@ topologies = {
     'hex': {
         'cells_number': 19,
         'possible_moves': 6,
-        'connection_degree': 4.11,
+        'connection_degree': 84/19,
         'data_dir': 'data/hex'
     },
     'square': {
@@ -22,7 +22,7 @@ topologies = {
     'triangle': {
         'cells_number': 10,
         'possible_moves': 6,
-        'connection_degree': 3,
+        'connection_degree': 3.6,
         'data_dir': 'data/triangle'
     }
 }
