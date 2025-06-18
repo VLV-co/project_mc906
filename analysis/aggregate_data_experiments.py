@@ -6,24 +6,32 @@ import re
 from typing import List, Dict, Tuple
 
 # Constants for each topology
+# Agora sem cells_number fixo, pois pode variar conforme o sufixo do diretório
+
 topologies = {
     'hex': {
-        'cells_number': 19,
         'possible_moves': 6,
         'connection_degree': 84/19,
-        'data_dir': 'data/hex'
+        'data_dirs': [
+            ('data/hex', 19),
+            ('data/hex_2', 7),
+            ('data/hex_3', 9)
+        ]
     },
     'square': {
-        'cells_number': 16,
         'possible_moves': 4,
         'connection_degree': 3,
-        'data_dir': 'data/square'
+        'data_dirs': [
+            ('data/square', 16),
+            ('data/square_3', 9)
+        ]
     },
     'triangle': {
-        'cells_number': 10,
         'possible_moves': 6,
         'connection_degree': 3.6,
-        'data_dir': 'data/triangle'
+        'data_dirs': [
+            ('data/triangle', 10)
+        ]
     }
 }
 
@@ -50,22 +58,26 @@ def collect_max_tiles_by_depth(data_dir: str) -> Dict[int, List[int]]:
             max_tiles_by_depth[depth].extend(df['max_tile'].tolist())
     return max_tiles_by_depth
 
+
 def main():
     rows = []
     for topo, params in topologies.items():
-        max_tiles_by_depth = collect_max_tiles_by_depth(params['data_dir'])
-        for depth, max_tiles in max_tiles_by_depth.items():
-            if not max_tiles:
+        for data_dir, cells_number in params['data_dirs']:
+            if not os.path.exists(data_dir):
                 continue
-            mean_max_tile = float(np.mean(np.log2(max_tiles)))
-            rows.append({
-                'topology': topo,
-                'cells_number': params['cells_number'],
-                'possible_moves': params['possible_moves'],
-                'connection_degree': params['connection_degree'],
-                'depth': depth,
-                'mean_log2_max_tile': mean_max_tile
-            })
+            max_tiles_by_depth = collect_max_tiles_by_depth(data_dir)
+            for depth, max_tiles in max_tiles_by_depth.items():
+                if not max_tiles:
+                    continue
+                mean_max_tile = float(np.mean(np.log2(max_tiles)))
+                rows.append({
+                    'topology': topo,
+                    'cells_number': cells_number,
+                    'possible_moves': params['possible_moves'],
+                    'connection_degree': params['connection_degree'],
+                    'depth': depth,
+                    'mean_log2_max_tile': mean_max_tile
+                })
     out_df = pd.DataFrame(rows)
     out_df.to_csv('data/aggregated/experiments.csv', index=False)
 
