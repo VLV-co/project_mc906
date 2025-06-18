@@ -30,7 +30,8 @@ topologies = {
         'possible_moves': 6,
         'connection_degree': 3.6,
         'data_dirs': [
-            ('data/triangle', 10)
+            ('data/triangle', 10),
+            ('data/triangle_3', 6),
         ]
     }
 }
