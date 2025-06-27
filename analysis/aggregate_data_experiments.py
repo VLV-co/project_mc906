@@ -3,10 +3,7 @@ import glob
 import pandas as pd
 import numpy as np
 import re
-from typing import List, Dict, Tuple
-
-# Constants for each topology
-# Agora sem cells_number fixo, pois pode variar conforme o sufixo do diretório
+from typing import List, Dict
 
 topologies = {
     'hex': {
@@ -36,11 +33,8 @@ topologies = {
     }
 }
 
-MU: float = 0.05
-
-
 def extract_depth_from_filename(filename: str) -> int:
-    """Extract depth from filename, return 0 if not found (e.g., for random)."""
+
     match = re.search(r'depth_(\d+)', filename)
     if match:
         return int(match.group(1))
@@ -48,7 +42,7 @@ def extract_depth_from_filename(filename: str) -> int:
 
 
 def collect_max_tiles_by_depth(data_dir: str) -> Dict[int, List[int]]:
-    """Collect all max_tile values from all CSVs in a directory, grouped by depth."""
+
     max_tiles_by_depth: Dict[int, List[int]] = {}
     for csv_file in glob.glob(os.path.join(data_dir, '*.csv')):
         depth = extract_depth_from_filename(os.path.basename(csv_file))
