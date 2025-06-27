@@ -7,7 +7,7 @@ class Game2048:
     def __init__(self, board_variant = 'square', size = 4, animation = False):
         self.board_variant = board_variant
         self.animation = animation
-        self.new_tiles = []  # Lista para armazenar novos blocos animados
+        self.new_tiles = []
         if board_variant == 'square' :
             self.direction = {'right': 0, 'left': 1, 'up': 2, 'down': 3}
         else:
@@ -180,11 +180,9 @@ class Game2048:
 
     def mirror(self, board):
         for i, row in enumerate(board):
-            # Extrai os valores não-'x' e seus índices
             values = [v for v in row if v != 'x'][::-1]
             indices = [j for j, v in enumerate(row) if v != 'x']
 
-            # Sobrescreve a linha diretamente
             for j, val in zip(indices, values):
                 row[j] = val
 
@@ -197,14 +195,12 @@ class Game2048:
                 new_row[i] *= 2
                 score += new_row[i]
                 del new_row[i + 1]
-                # não incrementa i, pois o próximo item mudou de posição
             else:
                 i += 1
 
         return new_row, score
 
     def get_max_tile(self) -> int:
-        """Returns the highest tile currently on the board."""
         return int(np.max(self.board[self.board != 'x']))
     
     def _has_empty_cells(self) -> int:
@@ -274,7 +270,6 @@ class Game2048:
 
             self._draw_tile(self.screen, self.board[i][j], n, scale)
 
-        # Score e overlay
         rect_width, rect_height = 130, 80
         score_rect = pygame.Rect((self.screen_width - rect_width) // 2, 10, rect_width, rect_height)
         pygame.draw.rect(self.screen, (119, 110, 101), score_rect, border_radius=16)

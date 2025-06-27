@@ -7,32 +7,24 @@ from game import Game2048
 
 
 def mirror(board: np.ndarray) -> None:
-    """Mirror the board horizontally."""
+
     for i, row in enumerate(board):
-        # Extract non-'x' values and their indices
         values = [v for v in row if v != 'x'][::-1]
         indices = [j for j, v in enumerate(row) if v != 'x']
-        
-        # Overwrite the row directly
+
         for j, val in zip(indices, values):
             row[j] = val
 
 
 def merge(row: List) -> Tuple[List, int]:
-    """Merge a single row to the left and return score."""
-    # Remove 'x' values for processing
     valid_values = [v for v in row if v != 'x']
-    
-    # Shift non-zero values to the left
+
     shifted = [v for v in valid_values if v != 0]
-    score = 0
-    
-    # Merge adjacent equal values
+    score = 0  
     merged = []
     i = 0
     while i < len(shifted):
         if i + 1 < len(shifted) and shifted[i] == shifted[i + 1]:
-            # Merge the tiles
             merged_value = shifted[i] * 2
             merged.append(merged_value)
             score += merged_value
@@ -45,14 +37,12 @@ def merge(row: List) -> Tuple[List, int]:
 
 
 def merge_left(board: np.ndarray) -> int:
-    """Merge all rows to the left and return total score."""
     total_score = 0
     
     for i in range(len(board)):
         row, score = merge(board[i])
         total_score += score
-        
-        # Pad with zeros to maintain original length of valid positions
+
         valid_positions = len([v for v in board[i] if v != 'x'])
         while len(row) < valid_positions:
             row.append(0)
@@ -72,18 +62,7 @@ def merge_left(board: np.ndarray) -> int:
 
 
 def move_tiles(direction: int, board: np.ndarray, board_variant: str, direction_map: dict) -> Tuple[int, bool]:
-    """
-    Move tiles in the specified direction.
-    
-    Args:
-        direction: Direction to move tiles
-        board: Game board (modified in place)
-        board_variant: 'square' or 'triangle'
-        direction_map: Direction mapping dictionary
-        
-    Returns:
-        Tuple of (score, moved) where moved indicates if board changed
-    """
+
     original_board = board.copy()
     score = 0
     
@@ -128,8 +107,8 @@ def move_tiles(direction: int, board: np.ndarray, board_variant: str, direction_
     return score, moved
 
 
-def has_moves(board: np.ndarray, board_coordinates: List, board_variant: str, direction_map: dict) -> bool:
-    """Check if any valid moves are available."""
+def has_moves(board: np.ndarray, board_variant: str, direction_map: dict) -> bool:
+
     for direction in direction_map.values():
         temp_board = copy.deepcopy(board)
         _, moved = move_tiles(direction, temp_board, board_variant, direction_map)
@@ -140,7 +119,7 @@ def has_moves(board: np.ndarray, board_coordinates: List, board_variant: str, di
 
 def heuristic(board: np.ndarray, heuristic_type: str, snake_weights: np.ndarray, 
               board_coordinates: List) -> float:
-    """Heuristic evaluation of the board."""
+
     flat = [board[i][j] for i, j in board_coordinates if board[i][j] != 'x']
     empty_cells = flat.count(0)
     max_tile = max(flat) if flat else 0
@@ -165,16 +144,7 @@ def heuristic(board: np.ndarray, heuristic_type: str, snake_weights: np.ndarray,
 
 
 def expectimax_worker(args: Tuple) -> float:
-    """
-    Worker function for parallel expectimax computation.
-    
-    Args:
-        args: Tuple containing (board, depth, is_player, max_depth, heuristic_type, 
-              snake_weights, board_coordinates, board_variant, direction_map)
-    
-    Returns:
-        float: Expected utility of the board.
-    """
+
     (board, depth, is_player, max_depth, heuristic_type, 
      snake_weights, board_coordinates, board_variant, direction_map) = args
     
@@ -189,7 +159,6 @@ def expectimax_worker(args: Tuple) -> float:
             if not moved:
                 continue
             
-            # Recursive call for deeper levels
             args_new = (new_board, depth + 1, False, max_depth, heuristic_type,
                        snake_weights, board_coordinates, board_variant, direction_map)
             value = expectimax_worker(args_new)
@@ -206,7 +175,6 @@ def expectimax_worker(args: Tuple) -> float:
                 new_board = copy.deepcopy(board)
                 new_board[i][j] = value
                 
-                # Recursive call for deeper levels
                 args_new = (new_board, depth + 1, True, max_depth, heuristic_type,
                            snake_weights, board_coordinates, board_variant, direction_map)
                 total += prob * expectimax_worker(args_new)
@@ -215,15 +183,7 @@ def expectimax_worker(args: Tuple) -> float:
 
 
 def evaluate_move_worker(args: Tuple) -> Tuple[int, float]:
-    """
-    Worker function to evaluate a single move.
-    
-    Args:
-        args: Tuple containing move evaluation parameters
-        
-    Returns:
-        Tuple[int, float]: (direction, value) pair
-    """
+
     (direction, board, max_depth, heuristic_type, snake_weights, 
      board_coordinates, board_variant, direction_map) = args
     
@@ -241,43 +201,25 @@ def evaluate_move_worker(args: Tuple) -> Tuple[int, float]:
 
 
 class ExpectiMaxSearch:
-    """Agent that plays 2048 using the parallelized Expectimax search algorithm."""
 
     def __init__(self, game_instance: Game2048, heuristic: Literal["empty_cells", "snake"], 
                  max_depth: int = 3, num_processes: int = None):
-        """
-        Initializes the Expectimax agent.
 
-        Args:
-            game_instance (Game2048): Instance of the 2048 game.
-            max_depth (int): Maximum search depth.
-            heuristic (Literal): Heuristic to evaluate board states ('empty_cells' or 'snake').
-            num_processes (int): Number of processes to use. If None, uses CPU count.
-        """
         self.game = game_instance
         self.max_depth = max_depth
         self.heuristic_type = heuristic
         self.num_processes = num_processes
         
-        # Extract simple data for workers
         self.board_coordinates = list(game_instance.board_coordinates)
         self.board_variant = game_instance.board_variant
         self.direction_map = dict(game_instance.direction)
         
-        # Pre-compute snake weights if needed
         self.snake_weights = self._generate_snake_weights() if heuristic == "snake" else None
 
     def get_best_move(self) -> int:
-        """
-        Computes the best move using the parallelized Expectimax algorithm.
 
-        Returns:
-            int: Number of a direction representing the best move.
-        """
-        # Get current board state
         current_board = copy.deepcopy(self.game.board)
         
-        # Prepare arguments for each move evaluation
         move_args = []
         for direction in self.direction_map.values():
             args = (direction, current_board, self.max_depth, self.heuristic_type,
@@ -287,13 +229,11 @@ class ExpectiMaxSearch:
         best_score = -float("inf")
         best_move = None
         
-        # Use ProcessPoolExecutor for parallel move evaluation
+        # Parallel move evaluation
         with ProcessPoolExecutor(max_workers=self.num_processes) as executor:
-            # Submit all move evaluation tasks
             future_to_move = {executor.submit(evaluate_move_worker, args): args[0] 
                              for args in move_args}
             
-            # Collect results as they complete
             for future in as_completed(future_to_move):
                 direction, value = future.result()
                 if value > best_score:
@@ -303,12 +243,7 @@ class ExpectiMaxSearch:
         return best_move
 
     def _generate_snake_weights(self) -> np.ndarray:
-        """
-        Generates a weight matrix for the snake heuristic.
 
-        Returns:
-            np.ndarray: Snake weight matrix.
-        """
         board = self.game.board
         heuristic_map = np.zeros_like(board, dtype=np.int64)
         num_cells = sum(1 for i, j in self.board_coordinates if board[i][j] != 'x') - 1
@@ -324,19 +259,16 @@ class ExpectiMaxSearch:
 
 
 if __name__ == '__main__':
-    # Run an example game with parallelized Expectimax agent
     game = Game2048(board_variant='hex', size=3)
     agent = ExpectiMaxSearch(game_instance=game, max_depth=5, heuristic='snake', num_processes=6)
     
     steps = 1
     while not game.game_over:
-        # Let the ExpectiMax agent choose the best move
         direction = agent.get_best_move()
         if direction is None:
             print("No valid move found by AI.")
             break
 
-        # Play the move in the real game
         _, score = game.play_step(direction)
         game.draw_board()
         print(f"Step {steps} | Move: {direction} | Score: {score}")

@@ -10,13 +10,6 @@ from expectimax_search import ExpectiMaxSearch
 from game import Game2048
 
 def parse_args() -> argparse.Namespace:
-    """
-    Parses command-line arguments for running 2048 experiments.
-
-    Returns:
-        argparse.Namespace: Parsed arguments including agent type, heuristic, depth, number of games, 
-        board variant, board size, and output directory.
-    """
     parser = argparse.ArgumentParser(description="Run 2048 Experiment")
 
     parser.add_argument("-agent", type=str, default="expectimax", choices=["expectimax", "random"],
@@ -44,21 +37,6 @@ def play_game(
         depth: Optional[int] = None,
     ) -> Dict[str, int]:
 
-    """
-    Runs a single game of 2048 using the specified agent and logs key milestones.
-
-    Args:
-        game (Game2048): The 2048 game instance.
-        game_number (int): Identifier for the current game (used in logs).
-        log_file_handle (file object): Open file handle for logging.
-        agent_type (str): Type of agent to use ("expectimax" or "random").
-        heuristic (Optional[str]): Heuristic strategy used by the expectimax agent. Defaults to None.
-        depth (Optional[int]): Maximum depth for the expectimax search. Defaults to None.
-
-    Returns:
-        Dict[str, int]: Dictionary containing game number, total move count, final score
-        maximum tile reached, and average time per move (in seconds).
-    """
     move_count = 0
     previous_max_tile = 0
     move_durations = []
@@ -83,7 +61,6 @@ def play_game(
         duration = time.time() - start_time
         move_durations.append(duration)
 
-        # Play the move in the real game
         _, score = game.play_step(direction)
         game.draw_board()
 
