@@ -12,8 +12,8 @@ BOARD_VARIANT=$1
 SIZE=$2
 
 # Run for expectimax agent with all heuristics and depths
-for HEURISTIC in snake; do
-    for DEPTH in 4; do
+for HEURISTIC in empty_cells snake; do
+    for DEPTH in 1 2 3 4; do
         python3 main.py \
             -agent expectimax \
             -heuristic $HEURISTIC \
