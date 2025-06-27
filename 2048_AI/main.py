@@ -65,7 +65,7 @@ def play_game(
 
     agent = None
     if agent_type == "expectimax":
-        agent = ExpectiMaxSearch(game_instance=game, max_depth=depth, heuristic=heuristic)
+        agent = ExpectiMaxSearch(game_instance=game, max_depth=depth, heuristic=heuristic, num_processes=6)
 
     while not game.game_over:
         start_time = time.time()
@@ -159,7 +159,7 @@ def main():
                 f"Average move time: {result['avg_move_time_sec']:>7.4f}s"
             )
 
-    pd.DataFrame(game_data).to_csv(os.path.join(log_dir, "summary.csv"), index=False)
+            pd.DataFrame(game_data).to_csv(os.path.join(log_dir, "summary.csv"), index=False)
 
 if __name__ == "__main__":
     main()
